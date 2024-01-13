@@ -6,12 +6,16 @@
  *  begining time: 2023/12
  *  version  time: 2024/1/7
  *  update describe:
+ *   [2024/1/13] Add Power attract mode
+ *   [2024/1/13] Add Power random throw
  *   [2024/1/7] Add Power mode
  *   [2024/1/7] Change struct to class.(OOP!!!)
  * 
 *************************************************/
 #include <iostream>
 #include <cmath>
+#include <time.h>
+#include <random>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 
@@ -52,6 +56,14 @@ struct Box{
 	point pos;//centre position for a box
 	double a;
 };
+
+//selfPlane move data
+double v=5;
+double rx,ry,lx,ly;
+Box selfBox = {200,200,5};
+bool lowSpeedMode;
+// end move data
+
 /*--------*/
 
 /*function declarations*/
@@ -66,7 +78,15 @@ void readEnemyBullets(const char *);
 void drawBox(Box);
 point operator+(point,point);
 point operator-(point,point);
+point operator/(point,double);
+point operator*(point,double);
 void throwPower(double,double);
+int randint(int,int);// get a random int
+double randdouble(double,double);// get a random double
+double distance(point,point);
+double _abs(double);// faster??
+point towards(point,point,double);//from to speed
+double mol(point);
 /*--------*/
 class flys{
 	protected:
@@ -178,7 +198,7 @@ class Enemys : public flys{
 			if (hits == 0)
 			{
 				die();
-				throwPower(hitbox.pos.x,hitbox.pos.y);
+				for(int i = 0; i < 5; i ++)throwPower(hitbox.pos.x,hitbox.pos.y);
 			}
 		}
 		int getstep(){
@@ -190,14 +210,19 @@ class Drops : public flys{
 	private:
 		int type;//0=power,1=dian
 		point a;//accelerate
+		bool lock;// if lock, fly to selfPlane
 	public:
 		int getType() {
 			return type;
 		}
+		void attract() {
+			lock = 1;
+		}
 		void init(int type, double x, double y){
+			lock = 0;
 			exist = 1;
-			v.y = -7;
-
+			v.y = -randdouble(5,10);
+			v.x = randdouble(-10,10);
 			switch (type)
 			{
 				case 0:
@@ -210,18 +235,28 @@ class Drops : public flys{
 
 			hitbox.pos.x = x;
 			hitbox.pos.y = y;
-			hitbox.a = 15;//const size for Drops
+			hitbox.a = 10;//const size for Drops
 
 			imgbox.pos.x = x;
 			imgbox.pos.y = y;
-			imgbox.a = 15;
+			imgbox.a = 10;
 		}
 		void update(){
+
 			flys::update();
-			if (v.y <= 3)v.y += 0.25;//accele Y
+
+			//check lock?
+			if (lowSpeedMode and distance(hitbox.pos,selfBox.pos)<100)lock = 1;
+			if (distance(hitbox.pos,selfBox.pos) < 25) lock = 1;
+			//check end
+			if (lock) {
+				v = towards(hitbox.pos, selfBox.pos, 10);// face to selfPlane
+				return;
+			}
+			if (v.y < 3)v.y += 0.25;//accele Y
 			else v.y = 3;
-			if (v.x >= 0)v.x -= 0.25;//accele X
-			else v.x = 0;
+			if (v.x > 0)v.x = (v.x-0.25)<0?0:(v.x-0.25);//accele X
+			else if (v.x < 0)v.x = (v.x+0.25)>0?0:(v.x+0.25);
 		}
 
 }powers[POWERSMAX];
@@ -251,12 +286,11 @@ struct Timer {
 		last = now;
 	}
 };
-//selfPlane move data
-double v=8;
-double rx,ry,lx,ly;
-Box selfBox = {200,200,5};
 #undef main
 int main(){
+	// init rand()
+	srand(time(0));
+	// end init rand()
 	if(!initSDL())return -1;
 	SDL_Event event;
 
@@ -290,6 +324,7 @@ int main(){
 						power ++;
 						continue;
 					}
+					if (selfBox.pos.y <= 200) powers[i].attract();
 					drawBox(powers[i].getHitbox());
 				}
 			}
@@ -464,8 +499,8 @@ void KBReflection() {
 	if(state[SDL_SCANCODE_RIGHT])rx = 1;
 	if(state[SDL_SCANCODE_UP])ly = 1;
 	if(state[SDL_SCANCODE_DOWN])ry = 1;
-	if(state[SDL_SCANCODE_LSHIFT])v = 4;
-	else v = 8;
+	if(state[SDL_SCANCODE_LSHIFT])v = 2.5, lowSpeedMode = 1;
+	else v = 5, lowSpeedMode = 0;
 	if(ShootTimer.check()) {
 		if(state[SDL_SCANCODE_Z]) {
 			int ori = bulAddPoint;// original place
@@ -481,6 +516,9 @@ void KBReflection() {
 		}
 		if(state[SDL_SCANCODE_A]) {
 			testEnemy.init(1,LEFTLINE+1,200,20,20,3,0,50);
+		}
+		if(state[SDL_SCANCODE_D]) {
+			throwPower(selfBox.pos.x,selfBox.pos.y-40);
 		}
 	}
 	if (switchTimer.ocheck()) {
@@ -534,6 +572,18 @@ point operator-(point a,point b){
 	ans.y = a.y - b.y;
 	return ans;
 }
+point operator/(point a,double b){
+	point ans;
+	ans.x = a.x/b;
+	ans.y = a.y/b;
+	return ans;
+}
+point operator*(point a,double b){
+	point ans;
+	ans.x = a.x*b;
+	ans.y = a.y*b;
+	return ans;
+}
 int powerAddPoint;
 void throwPower(double x,double y){
 	int ori = powerAddPoint;// original place
@@ -546,4 +596,23 @@ void throwPower(double x,double y){
 		}
 	}
 	powers[powerAddPoint].init(0,x,y);
+}
+int randint(int min, int max) {
+	return min+(rand()%(max-min+1));
+}
+double randdouble(double min, double max) {
+	return min+(((double)(rand()%(((int)(max-min))*1000)))/1000);
+}
+double _abs(double number){
+	return number>=0?number:-number;
+}
+double distance(point A, point B) {
+	return _abs(A.x-B.x) + _abs(A.y-B.y);
+}
+double mol(point A){
+	return sqrt(A.x*A.x+A.y*A.y);
+}
+point towards(point from, point to, double speed) {
+	point ans = to - from;
+	return ans *speed /mol(ans);
 }
