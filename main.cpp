@@ -35,6 +35,7 @@ using namespace std;
 #define SELFBULLETMAX 50 // bullets from selfPlane max number
 #define BULLETMAX 2000
 #define POWERSMAX 100
+#define DIANSMAX 100
 // sdl vars
 SDL_Window *window = nullptr;
 SDL_Renderer *renderer = nullptr;
@@ -44,13 +45,13 @@ SDL_Texture *background = nullptr;
 SDL_Texture *plane = nullptr;
 SDL_Texture *testEnemypic = nullptr;
 SDL_Texture *PowerPic = nullptr;
+SDL_Texture *DianPic = nullptr;
 
 const Uint8* state;//keyboard event read
 
 unsigned int power;
 bool quit = false;//main quit
 unsigned int preTick;//which tick is now's tick
-struct S_Box{double x,y,a;};// Sqare hitBox
 struct point{double x,y;};
 struct Box{
 	point pos;//centre position for a box
@@ -67,26 +68,32 @@ bool lowSpeedMode;
 /*--------*/
 
 /*function declarations*/
-bool initSDL();// init SDL including SDL_VEDIO, IMG_PNG, Window and icon
-void closeSDL();// release SDL
 SDL_Texture * getimage(const char *);// load a image(png)
-void putimage(SDL_Texture *, int, int, int = 0, int = 0);// put image to randerer
-void putimage(SDL_Texture *, Box);
-void KBReflection();// check KB event and update place of SelfPlane
+
 bool checkHit(Box,Box);// check 2 box if cross
-void readEnemyBullets(const char *);
+bool initSDL();// init SDL including SDL_VEDIO, IMG_PNG, Window and icon
+
+void closeSDL();// release SDL
 void drawBox(Box);
+void KBReflection();// check KB event and update place of SelfPlane
+void putimage(SDL_Texture *, int, int, int = 0, int = 0);// put image to randerer
+void putimage(SDL_Texture *, Box);// put image to randerer
+void showPower();// TODO : put main's show part in funcs
+void throwPower(double,double);// At this point throw a power
+void throwDian(double,double); // At this point throw a dian
+
+int randint(int,int);// get a random int
+
+double _abs(double);// faster??
+double distance(point,point);// Get 2 points distance(square)
+double mol(point);// point length (to O)
+double randdouble(double,double);// get a random double
+
 point operator+(point,point);
 point operator-(point,point);
 point operator/(point,double);
 point operator*(point,double);
-void throwPower(double,double);
-int randint(int,int);// get a random int
-double randdouble(double,double);// get a random double
-double distance(point,point);
-double _abs(double);// faster??
-point towards(point,point,double);//from to speed
-double mol(point);
+point towards(point,point,double);// from, to, speed
 /*--------*/
 class flys{
 	protected:
@@ -110,26 +117,26 @@ class flys{
 			v.x = dx;
 			v.y = dy;
 		}
-		void putPic() {
+		void putPic() { // put picture to renderer
 			putimage(this->pic,imgbox);
 		}
-		void update() {
+		void update() { // Lets MOVE!
 			hitbox.pos = v + hitbox.pos;
 			imgbox.pos = v + imgbox.pos;
 		}
-		void die() {
+		void die() { // disappeared qaq
 			exist = 0;
 		}
 		bool ifexist() { // check it if exist
 			return exist;
 		}
-		Box getHitbox() {
+		Box getHitbox() { // where am I?
 			return hitbox;
 		}
-		Box getImgbox() {
+		Box getImgbox() { // where am I? (+1)
 			return imgbox;
 		}
-		bool check() {
+		bool check() { // check if it out of screen
 			if (hitbox.pos.x <= LEFTLINE - 100 or hitbox.pos.x >= RIGHTLINE + 100) return 0;
 			if (hitbox.pos.y <= UPLINE - 100   or hitbox.pos.y >= DOWNLINE + 100)  return 0;
 			return 1;
@@ -139,9 +146,9 @@ class Bullet : public flys{
 	public:
 		void init(int choosepic, double x, double y, double hitsize, double imgsize, double dx, double dy) {
 			exist = 1;
-			//set pic
+			// set pic
 			switch (choosepic) {
-				case 1://bullet_a
+				case 1: // bullet_a
 					pic = bullet_a;
 					break;
 				default:
@@ -167,7 +174,7 @@ class Enemys : public flys{
 	public:
 		void init(int choosepic, double x, double y, double hitsize, double imgsize, double dx, double dy, int _hits) {
 			exist = 1;
-			//set pic
+			// set pic
 			switch (choosepic) {
 				case 1:// testpic
 					pic = testEnemypic;
@@ -191,31 +198,32 @@ class Enemys : public flys{
 		}
 		void update(){
 			flys::update();
-			step++;
+			step++; // step for function : throwBullet_followselfplane 
 		}
-		void getHit(){
+		void getHit() { // be hit by selfPlane qaq (nt!)
 			hits --;
 			if (hits == 0)
 			{
 				die();
-				for(int i = 0; i < 5; i ++)throwPower(hitbox.pos.x,hitbox.pos.y);
+				for(int i = 0; i < 5; i ++)throwPower(hitbox.pos.x,hitbox.pos.y); // awsl
+				for(int i = 0; i < 5; i ++)throwDian(hitbox.pos.x,hitbox.pos.y);
 			}
 		}
-		int getstep(){
+		int getstep() {
 			return step;
 		}
-		void throwBullet_followselfplane(double bspeed);
+		void throwBullet_followselfplane(double bspeed); // biu~
 }testEnemy;
 class Drops : public flys{
 	private:
-		int type;//0=power,1=dian
-		point a;//accelerate
+		int type;// 0 = power, 1 = dian
+		point a;// accelerate
 		bool lock;// if lock, fly to selfPlane
 	public:
-		int getType() {
+		int getType() { // what am i
 			return type;
 		}
-		void attract() {
+		void attract() { // be attracted
 			lock = 1;
 		}
 		void init(int type, double x, double y){
@@ -228,14 +236,16 @@ class Drops : public flys{
 				case 0:
 					pic = PowerPic;
 					break;
-				
+				case 1:
+					pic = DianPic;
+					break;
 				default:
 					break;
 			}
 
 			hitbox.pos.x = x;
 			hitbox.pos.y = y;
-			hitbox.a = 10;//const size for Drops
+			hitbox.a = 10; // const size for Drops
 
 			imgbox.pos.x = x;
 			imgbox.pos.y = y;
@@ -245,21 +255,21 @@ class Drops : public flys{
 
 			flys::update();
 
-			//check lock?
+			// check lock?
 			if (lowSpeedMode and distance(hitbox.pos,selfBox.pos)<100)lock = 1;
 			if (distance(hitbox.pos,selfBox.pos) < 25) lock = 1;
-			//check end
+			// check end
 			if (lock) {
 				v = towards(hitbox.pos, selfBox.pos, 10);// face to selfPlane
 				return;
 			}
-			if (v.y < 3)v.y += 0.25;//accele Y
+			if (v.y < 3)v.y += 0.25;// accele Y
 			else v.y = 3;
-			if (v.x > 0)v.x = (v.x-0.25)<0?0:(v.x-0.25);//accele X
+			if (v.x > 0)v.x = (v.x-0.25)<0?0:(v.x-0.25);// accele X
 			else if (v.x < 0)v.x = (v.x+0.25)>0?0:(v.x+0.25);
 		}
 
-}powers[POWERSMAX];
+}powers[POWERSMAX],dians[DIANSMAX];
 struct Timer {
 	unsigned int last,tick;
 	Timer (int _tick){
@@ -274,7 +284,7 @@ struct Timer {
 		}
 		return 0;
 	}
-	bool ocheck() {// only check
+	bool ocheck() { // only check
 		unsigned int now = SDL_GetTicks();
 		if (now > last + tick) {
 			return 1;
@@ -297,14 +307,15 @@ int main(){
 	Timer ScreenTimer = Timer(15);
 //	Timer SelfPlaneAnime = Timer(700);
 	while(!quit) {
-		//wheather quit
+		// wheather quit
 		if (ScreenTimer.check()) {
-			preTick++;
-			//update screen
-			SDL_RenderPresent(renderer);
+			preTick++; // next tick
+			
+			SDL_RenderPresent(renderer); // update screen
+
 			//ready for next tick fresh
-			//cls
-			SDL_RenderClear(renderer);
+			
+			SDL_RenderClear(renderer); // cls
 			//throw powers
 			for (int i = 0; i < POWERSMAX; i ++)
 			{
@@ -326,6 +337,29 @@ int main(){
 					}
 					if (selfBox.pos.y <= 200) powers[i].attract();
 					drawBox(powers[i].getHitbox());
+				}
+			}
+			// put dian
+			for (int i = 0; i < DIANSMAX; i ++)
+			{
+				if (dians[i].ifexist())
+				{
+					dians[i].update();
+					dians[i].putPic();
+					if (!dians[i].check())
+					{
+						dians[i].die();
+						continue;
+					}
+					if (checkHit(dians[i].getHitbox(),selfBox))
+					{
+						dians[i].die();
+						//TODO
+						power ++;
+						continue;
+					}
+					if (selfBox.pos.y <= 200) dians[i].attract();
+					drawBox(dians[i].getHitbox());
 				}
 			}
 			//put bullet from selfPlane
@@ -451,6 +485,7 @@ bool initSDL() {
 	plane = getimage("./image/plane.png");
 	testEnemypic = getimage("./image/enemy.png");
 	PowerPic = getimage("./image/power.png");
+	DianPic = getimage("./image/dian.png");
 	return 1;
 }
 void closeSDL() {
@@ -459,11 +494,11 @@ void closeSDL() {
 	SDL_DestroyTexture(background);
 	SDL_DestroyTexture(bullet_a);
 	SDL_DestroyTexture(PowerPic);
+	SDL_DestroyTexture(DianPic);
 
 	IMG_Quit();
 	
 	SDL_DestroyWindow( window );
-	window = nullptr;
 	
 	SDL_Quit();
 }
@@ -519,6 +554,9 @@ void KBReflection() {
 		}
 		if(state[SDL_SCANCODE_D]) {
 			throwPower(selfBox.pos.x,selfBox.pos.y-40);
+		}
+		if(state[SDL_SCANCODE_F]) {
+			throwDian(selfBox.pos.x,selfBox.pos.y-40);
 		}
 	}
 	if (switchTimer.ocheck()) {
@@ -588,7 +626,7 @@ int powerAddPoint;
 void throwPower(double x,double y){
 	int ori = powerAddPoint;// original place
 	while(powers[powerAddPoint].ifexist()){
-		powerAddPoint = (powerAddPoint + 1) % SELFBULLETMAX;
+		powerAddPoint = (powerAddPoint + 1) % POWERSMAX;
 		if (ori == powerAddPoint)
 		{
 			//cout<<"Space G\n";
@@ -596,6 +634,19 @@ void throwPower(double x,double y){
 		}
 	}
 	powers[powerAddPoint].init(0,x,y);
+}
+int dianAddPoint;
+void throwDian(double x,double y){
+	int ori = dianAddPoint;// original place
+	while(dians[dianAddPoint].ifexist()){
+		dianAddPoint = (dianAddPoint + 1) % DIANSMAX;
+		if (ori == dianAddPoint)
+		{
+			//cout<<"Space G\n";
+			return;
+		}
+	}
+	dians[dianAddPoint].init(1,x,y);
 }
 int randint(int min, int max) {
 	return min+(rand()%(max-min+1));
