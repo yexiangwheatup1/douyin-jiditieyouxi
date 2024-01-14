@@ -6,6 +6,7 @@
  *  begining time: 2023/12
  *  version  time: 2024/1/7
  *  update describe:
+ *   [2024/1/14] Add Dian mode, Add rotate "throwBullet_followselfplane"
  *   [2024/1/13] Add Power attract mode
  *   [2024/1/13] Add Power random throw
  *   [2024/1/7] Add Power mode
@@ -36,6 +37,7 @@ using namespace std;
 #define BULLETMAX 2000
 #define POWERSMAX 100
 #define DIANSMAX 100
+#define ATTRACTLINE 300
 // sdl vars
 SDL_Window *window = nullptr;
 SDL_Renderer *renderer = nullptr;
@@ -49,7 +51,7 @@ SDL_Texture *DianPic = nullptr;
 
 const Uint8* state;//keyboard event read
 
-unsigned int power;
+unsigned int power, dian;
 bool quit = false;//main quit
 unsigned int preTick;//which tick is now's tick
 struct point{double x,y;};
@@ -76,8 +78,8 @@ bool initSDL();// init SDL including SDL_VEDIO, IMG_PNG, Window and icon
 void closeSDL();// release SDL
 void drawBox(Box);
 void KBReflection();// check KB event and update place of SelfPlane
-void putimage(SDL_Texture *, int, int, int = 0, int = 0);// put image to randerer
-void putimage(SDL_Texture *, Box);// put image to randerer
+void putimage(SDL_Texture *, int, int, int = 0, int = 0);// put image to renderer
+void putimage(SDL_Texture *, Box);// put image to renderer
 void showPower();// TODO : put main's show part in funcs
 void throwPower(double,double);// At this point throw a power
 void throwDian(double,double); // At this point throw a dian
@@ -94,6 +96,7 @@ point operator-(point,point);
 point operator/(point,double);
 point operator*(point,double);
 point towards(point,point,double);// from, to, speed
+point rotate(point,double); // rotate an angle(deg)
 /*--------*/
 class flys{
 	protected:
@@ -212,7 +215,7 @@ class Enemys : public flys{
 		int getstep() {
 			return step;
 		}
-		void throwBullet_followselfplane(double bspeed); // biu~
+		void throwBullet_followselfplane(double ,double = 0); // biu~
 }testEnemy;
 class Drops : public flys{
 	private:
@@ -331,11 +334,12 @@ int main(){
 					if (checkHit(powers[i].getHitbox(),selfBox))
 					{
 						powers[i].die();
+						printf("power ++\n");
 						//TODO
 						power ++;
 						continue;
 					}
-					if (selfBox.pos.y <= 200) powers[i].attract();
+					if (selfBox.pos.y <= ATTRACTLINE) powers[i].attract();
 					drawBox(powers[i].getHitbox());
 				}
 			}
@@ -354,11 +358,12 @@ int main(){
 					if (checkHit(dians[i].getHitbox(),selfBox))
 					{
 						dians[i].die();
+						printf("dian ++\n");
 						//TODO
-						power ++;
+						dian ++;
 						continue;
 					}
-					if (selfBox.pos.y <= 200) dians[i].attract();
+					if (selfBox.pos.y <= ATTRACTLINE) dians[i].attract();
 					drawBox(dians[i].getHitbox());
 				}
 			}
@@ -386,12 +391,16 @@ int main(){
 			
 			if (testEnemy.ifexist())
 			{
-				//move exemy
+				//move enemy
 				testEnemy.update();
 				if (!testEnemy.check()){
 					testEnemy.die();
 				}
-				if (testEnemy.ifexist() and !(testEnemy.getstep() % 15))testEnemy.throwBullet_followselfplane(5);
+				if (testEnemy.ifexist() and !(testEnemy.getstep() % 15)) {
+					testEnemy.throwBullet_followselfplane(5);
+					testEnemy.throwBullet_followselfplane(5,10);
+					testEnemy.throwBullet_followselfplane(5,-10);
+				}
 				//put enemy
 				if (testEnemy.ifexist()) putimage(testEnemypic, testEnemy.getImgbox());
 				drawBox(testEnemy.getHitbox());
@@ -567,14 +576,9 @@ void KBReflection() {
 	}
 }
 int enemybulletAddPoint;
-void Enemys :: throwBullet_followselfplane (double bspeed) {
-	double toX = selfBox.pos.x - hitbox.pos.x,toY = selfBox.pos.y - hitbox.pos.y;
-	double bLength = sqrt(pow(toX,2) + pow(toY,2));
-	toX *= bspeed;
-	toY *= bspeed;
-	toX /= bLength;
-	toY /= bLength;
-	
+void Enemys :: throwBullet_followselfplane (double bspeed, double angle) {
+	point to = towards(hitbox.pos, selfBox.pos, bspeed);
+	if (angle != 0)to = rotate(to, angle);
 	int ori = enemybulletAddPoint;// original place
 	while(enemybullets[enemybulletAddPoint].ifexist()){
 		enemybulletAddPoint = (enemybulletAddPoint + 1) % BULLETMAX;
@@ -584,7 +588,7 @@ void Enemys :: throwBullet_followselfplane (double bspeed) {
 			return;
 		}
 	}
-	enemybullets[enemybulletAddPoint].init(1, hitbox.pos.x, hitbox.pos.y,10,20, toX, toY);
+	enemybullets[enemybulletAddPoint].init(1, hitbox.pos.x, hitbox.pos.y,10,20, to.x, to.y);
 }
 bool checkHit(Box A,Box B) {
 	if (abs(A.pos.x-B.pos.x)>A.a+B.a)return 0;
@@ -666,4 +670,11 @@ double mol(point A){
 point towards(point from, point to, double speed) {
 	point ans = to - from;
 	return ans *speed /mol(ans);
+}
+point rotate(point A, double angle) {
+	point ans;
+	double rad = angle*3.14159/180;
+	ans.x = A.x*cos(rad)-A.y*sin(rad);
+	ans.y = A.y*cos(rad)+A.x*sin(rad);
+	return ans;
 }
