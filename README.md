@@ -1,37 +1,18 @@
-# 一个朴素的弹幕射击游戏
-- 作者：qytlix  
+抖音最新弹幕游戏源码
 
-良好玩耍 ^v^
+完整前后端全开源
 
-## 基础操作
-按 `Z` 射击  
-按 `X` 退出  
-方向键移动
+http://web3incubators.com/?mod=buy&tid=3828
 
-## 更新 2024/1/19
-添加按钮组件，编译时打开 `` 即可测试
+http://web3incubators.com/?mod=buy&tid=2310
 
-<details>
-<summary>
-更多更新内容
-</summary>
+免费cocoscreator 游戏源码 http://web3incubators.com/?cid=66
 
-## 更新 2024/1/14  
-添加 `点` 抛出
-添加 `自机狙` 的 `转向` （大概是这个）
-
-## 更新 2024/1/13  
-添加 `Power` 随机抛出
-
-## 更新 2024/1/7
-添加 `Power`  
-修改至 `OOP`
-
-## 更新 2024/1/1
-修改按 `A` 使得敌机出现  
-添加 `S` 显示判定框
-
-## 更新 2023/12/30
-新增敌机于200 200处  
-按 `A` 使敌机射  
-</details>
+cocoscreator unity laya 源码引擎 游戏开发
+cocoscreator unity laya源碼引擎遊戲開發
+cocoscreator unity layaソースコードエンジンゲーム開発
+cocoscreator unity laya 소스 엔진 게임 개발
+Cococreator Unity Laya source code engine game development
+Nhà phát triển: cocoscreator unity laya source engine game
+cococreator ความสามัคคี laya Source Engine การพัฒนาเกม
+Разработчик игры Cocoscreator Unity Laya
